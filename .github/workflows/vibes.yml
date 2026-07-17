@@ -1,0 +1,104 @@
+name: Publish vibes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'images/**'
+      - 'index.html'
+      - 'scripts/vibes.py'
+      - '.github/workflows/vibes.yml'
+  workflow_dispatch:
+
+# contents: write so it can commit the compressed images back over your originals.
+# That commit is the point, not a side effect — an original left sitting in the
+# repo is a public file with your GPS coordinates in it.
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      # fetch-depth: 0 so the rewrite step below can reach the commit you pushed
+      # from and rewind past it. A shallow clone can't.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pillow pillow-heif
+
+      - run: python3 scripts/vibes.py
+
+      # Replacing the original in the working tree is not enough on its own: the
+      # commit that carried it is still in the history of a public repo, so a
+      # plain `git clone` hands anyone the untouched file with its GPS intact.
+      # Verified — this isn't hypothetical.
+      #
+      # So rewind to the commit you pushed from and rebuild your upload as a
+      # single commit that only ever contained the converted files. The original
+      # blob ends up referenced by nothing.
+      #
+      # Pushes made with GITHUB_TOKEN don't trigger workflows, so this can't
+      # retrigger itself. Deploy happens below in this same run regardless.
+      - name: Commit compressed images, without the originals
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # No rewind target on workflow_dispatch, or on the branch's first push.
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+             && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            git reset --soft "$BEFORE"
+            git add -A
+            if ! git diff --staged --quiet; then
+              git commit -m "vibes: add images"
+              git push --force-with-lease
+            fi
+          else
+            git add -A
+            git diff --staged --quiet || git commit -m "vibes: compress and rebuild list"
+            git push
+          fi
+
+      # Only .webp is copied — never a glob of whatever's in images/. Anything
+      # else in there is either unprocessed or not an image, and in both cases
+      # publishing it is the failure mode this whole thing exists to avoid.
+      - name: Assemble site
+        run: |
+          mkdir -p _site/images
+          cp index.html image_widths_heights.json _site/
+          find images -maxdepth 1 -name '*.webp' -exec cp {} _site/images/ \;
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      # Last, so a rejected file doesn't block the good ones from going live —
+      # but the run still goes red and emails you, rather than passing silently.
+      - name: Report rejected files
+        run: |
+          if [ -f .vibes-rejected ]; then
+            echo "::error::These files couldn't be published and were removed from images/:"
+            cat .vibes-rejected
+            echo "Re-save them as JPEG or PNG and upload again."
+            exit 1
+          fi
