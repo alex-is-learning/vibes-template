@@ -26,6 +26,10 @@ To remove one: click it → the bin icon → commit.
 
 Everything after that is automatic. The Action converts what you uploaded, rebuilds the list the page reads, and deploys. Watch it in the **Actions** tab if you're curious; ignore it if you're not.
 
+## Alternative: a desktop folder that syncs itself
+
+If you'd rather never open github.com at all: point Claude Code at this repo (once you've cloned your own copy) and ask it to run `scripts/install-local-sync.sh`. It sets up a `vibes-inbox` alias on your Desktop, wired to a nightly job — drag a photo in and it goes live overnight, drag one out and it comes down, with no commit/upload step in between. `scripts/local-sync.sh` is what runs each night; run it yourself anytime you don't want to wait. `scripts/uninstall-local-sync.sh` turns it back off without touching your photos. This needs a terminal and git push access to your repo, so it's the Claude-Code path, not the four-click one above — either flow can be used, and you can switch between them (the installer moves anything already in `images/` into the inbox first).
+
 ## What it does to your images, and why
 
 Every upload gets re-encoded to WebP: resized so the longest edge is 1400px, quality 82. The compressed version replaces the original in the repo. Two reasons, and the first is the one that matters:
