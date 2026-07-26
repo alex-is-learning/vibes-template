@@ -18,19 +18,54 @@ echo "--- $(date '+%Y-%m-%d %H:%M') ---"
 mkdir -p "$INBOX"
 
 git fetch origin "$BRANCH"
+
+# The Action rewrites history whenever an image is uploaded through github.com,
+# so there's no merge to do here — lining up with the remote means a hard reset.
+# That would also wipe any edit to index.html, which is where your own words at
+# the top of the page live: you'd write a paragraph, see it all evening, and find
+# it gone in the morning with nothing to say why. So anything changed outside the
+# two paths this script owns is carried across the reset and put back after it.
+CARRY="$(mktemp -d)"
+trap 'rm -rf "$CARRY"' EXIT
+git diff --name-only "origin/$BRANCH" -- . \
+  ':(exclude)images' ':(exclude)image_widths_heights.json' \
+  | while IFS= read -r f; do
+      [ -f "$f" ] || continue
+      mkdir -p "$CARRY/$(dirname "$f")"
+      cp "$f" "$CARRY/$f"
+    done
+
 git reset --hard "origin/$BRANCH"
+
+find "$CARRY" -type f | while IFS= read -r kept; do
+  f="${kept#$CARRY/}"
+  cp "$kept" "$f"
+  echo "kept your changes to $f"
+done
 
 # images/ becomes exactly what's in the inbox right now — additions and
 # removals both fall out of this for free. vibes.py re-encodes everything,
 # but the encode is deterministic, so unchanged inputs produce byte-identical
 # output and nothing gets committed.
+#
+# Walked recursively, because dragging a whole album out of Photos is the most
+# obvious thing to do with a folder like this, and a non-recursive walk would
+# have ignored every photo in it in silence. The page is flat, so a subfolder's
+# name is folded into the filename rather than lost — that also keeps two files
+# called IMG_0001.jpg in different folders from overwriting each other.
 rm -f images/*.webp
-find "$INBOX" -maxdepth 1 -type f ! -name '.*' ! -name "$NOTICE_NAME" -exec cp {} images/ \;
+find "$INBOX" -type f ! -name '.*' ! -name "$NOTICE_NAME" | while IFS= read -r f; do
+  rel="${f#"$INBOX"/}"
+  cp "$f" "images/$(printf '%s' "$rel" | tr '/' '-')"
+done
 
 ./.venv/bin/python3 scripts/vibes.py
 
-if [[ -n "$(git status --porcelain -- images image_widths_heights.json)" ]]; then
-  git add -A -- images image_widths_heights.json
+# index.html is in here too, not just the images: it's the file you edit to change
+# the words at the top, and carrying an edit across the reset above without ever
+# committing it would leave it living on your Mac and never reaching the page.
+if [[ -n "$(git status --porcelain -- images image_widths_heights.json index.html)" ]]; then
+  git add -A -- images image_widths_heights.json index.html
   git commit -m "vibes sync $(date '+%Y-%m-%d %H:%M')" --quiet
   git push origin "$BRANCH"
   echo "pushed"

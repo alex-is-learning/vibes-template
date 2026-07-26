@@ -11,9 +11,8 @@ This is the GitHub Pages version, built so you never have to open a terminal. **
 1. Click **Use this template → Create a new repository** at the top of this page.
 2. Name it `vibes`. It has to be **public** — GitHub Pages on a private repo is a paid feature, and this page is public regardless.
 3. In your new repo: **Settings → Pages → Source → GitHub Actions**. (Not "Deploy from a branch" — this template deploys from the Action.)
-4. **Settings → Actions → General → Workflow permissions → Read and write**, then Save. New repos default to read-only, and the deploy needs write — skip this and your first upload fails with a permissions error.
-5. Go to the **Actions** tab and enable workflows if it asks.
-6. Open `images/`, delete the three sample gradients, drag your own in.
+4. Go to the **Actions** tab and enable workflows if it asks.
+5. Open `images/`, select all three sample gradients, and delete them in **one** commit — then drag your own in. (One commit at a time is the general rule here: each one starts a run, and a new run cancels the one before it.)
 
 Your page is at `https://<your-username>.github.io/vibes/`, live about a minute after each change.
 
@@ -29,7 +28,11 @@ Everything after that is automatic. The Action converts what you uploaded, rebui
 
 ## Alternative: a desktop folder that syncs itself
 
-If you'd rather never open github.com at all: point Claude Code at this repo (once you've cloned your own copy) and ask it to run `scripts/install-local-sync.sh`. It sets up a `vibes-inbox` alias on your Desktop, wired to a nightly job — drag a photo in and it goes live overnight, drag one out and it comes down, with no commit/upload step in between. `scripts/local-sync.sh` is what runs each night; run it yourself anytime you don't want to wait. `scripts/uninstall-local-sync.sh` turns it back off without touching your photos. If something in the folder can't be published — a video that came off your camera roll with the photos, a damaged file — a plain-text note appears in the folder naming it, and disappears again once you've dealt with it. Nothing to check; it comes to you. This needs a terminal and git push access to your repo, so it's the Claude-Code path, not the four-click one above — either flow can be used, and you can switch between them (the installer moves anything already in `images/` into the inbox first).
+**macOS only** — it uses a Desktop alias and a launchd job, neither of which exists on Windows or Linux. Everything above works anywhere.
+
+If you'd rather never open github.com at all: point Claude Code at this repo (once you've cloned your own copy) and ask it to run `scripts/install-local-sync.sh`. It sets up a `vibes-inbox` alias on your Desktop, wired to a nightly job — drag a photo in and it goes live overnight, drag one out and it comes down, with no commit/upload step in between. `scripts/local-sync.sh` is what runs each night; run it yourself anytime you don't want to wait. `scripts/uninstall-local-sync.sh` turns it back off without touching your photos. If something in the folder can't be published — a video that came off your camera roll with the photos, a damaged file — a plain-text note appears in the folder naming it, and disappears again once you've dealt with it. Nothing to check; it comes to you. Subfolders work, so you can drag a whole album in and keep it filed; the page stays flat and folds the folder name into the filename.
+
+Edits you make to `index.html` on your own machine — your words at the top — are kept and pushed by the nightly run. Edit it on github.com instead and the next run picks that up. Either way, don't do both at once on the same day. This needs a terminal and git push access to your repo, so it's the Claude-Code path, not the four-click one above — either flow can be used, and you can switch between them (the installer moves anything already in `images/` into the inbox first).
 
 ## What it does to your images, and why
 

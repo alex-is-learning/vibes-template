@@ -20,7 +20,17 @@ mkdir -p "$INBOX"
 # moves into the inbox first, so switching flows doesn't drop it off the page.
 find images -maxdepth 1 -type f ! -name '.*' -exec mv {} "$INBOX/" \;
 
-ln -sf "$INBOX" "$HOME/Desktop/vibes-inbox"
+# -n, or an existing alias is followed and the new one lands *inside* the folder
+# it points at — a self-referential symlink in your own inbox, and no error. A
+# real folder of that name is a different problem: silently swallowing it would
+# be worse than stopping, since it may well have your photos in it.
+ALIAS="$HOME/Desktop/vibes-inbox"
+if [ -e "$ALIAS" ] && [ ! -L "$ALIAS" ]; then
+  echo "There's already a real folder called 'vibes-inbox' on your Desktop."
+  echo "Rename or move it, then run this again — I'm not going to touch it."
+  exit 1
+fi
+ln -sfn "$INBOX" "$ALIAS"
 
 # Self-contained venv so this doesn't depend on the system python having
 # pillow/pillow-heif already — the GitHub Action's environment doesn't help here.
