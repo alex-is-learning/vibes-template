@@ -25,10 +25,21 @@ git fetch origin "$BRANCH"
 # the top of the page live: you'd write a paragraph, see it all evening, and find
 # it gone in the morning with nothing to say why. So anything changed outside the
 # two paths this script owns is carried across the reset and put back after it.
+#
+# What counts as "yours" is measured against your own last commit, never against
+# the remote — otherwise editing the text on github.com would look like a local
+# change here, and this would faithfully carry the stale copy across and push it
+# back over what you just wrote. Two sources: edits you haven't committed, and
+# edits you committed but haven't pushed.
 CARRY="$(mktemp -d)"
 trap 'rm -rf "$CARRY"' EXIT
-git diff --name-only "origin/$BRANCH" -- . \
-  ':(exclude)images' ':(exclude)image_widths_heights.json' \
+BASE="$(git merge-base "origin/$BRANCH" HEAD)"
+{
+  git diff --name-only HEAD -- . \
+    ':(exclude)images' ':(exclude)image_widths_heights.json'
+  git diff --name-only "$BASE" HEAD -- . \
+    ':(exclude)images' ':(exclude)image_widths_heights.json'
+} | sort -u \
   | while IFS= read -r f; do
       [ -f "$f" ] || continue
       mkdir -p "$CARRY/$(dirname "$f")"
