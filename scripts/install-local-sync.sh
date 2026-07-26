@@ -14,22 +14,27 @@ HOUR="${VIBES_HOUR:-22}"
 MINUTE="${VIBES_MINUTE:-0}"
 LABEL="${VIBES_LABEL:-com.$(whoami | tr -cd 'a-zA-Z0-9').vibes-daily}"
 
+# Every check that can refuse goes before anything that changes your files, so a
+# refusal leaves you exactly where you started rather than halfway.
+#
+# -n on the symlink below, or an existing alias is followed and the new one lands
+# *inside* the folder it points at — a self-referential symlink in your own
+# inbox, and no error. Something real of that name is a different problem:
+# swallowing it silently would be worse than stopping, since it may well have
+# your photos in it.
+ALIAS="$HOME/Desktop/vibes-inbox"
+if [ -e "$ALIAS" ] && [ ! -L "$ALIAS" ]; then
+  echo "There's already something called 'vibes-inbox' on your Desktop, and it"
+  echo "isn't an alias. Rename or move it, then run this again — I won't touch it."
+  exit 1
+fi
+
 mkdir -p "$INBOX"
 
 # Anything already uploaded through the images/ folder (e.g. via github.com)
 # moves into the inbox first, so switching flows doesn't drop it off the page.
 find images -maxdepth 1 -type f ! -name '.*' -exec mv {} "$INBOX/" \;
 
-# -n, or an existing alias is followed and the new one lands *inside* the folder
-# it points at — a self-referential symlink in your own inbox, and no error. A
-# real folder of that name is a different problem: silently swallowing it would
-# be worse than stopping, since it may well have your photos in it.
-ALIAS="$HOME/Desktop/vibes-inbox"
-if [ -e "$ALIAS" ] && [ ! -L "$ALIAS" ]; then
-  echo "There's already a real folder called 'vibes-inbox' on your Desktop."
-  echo "Rename or move it, then run this again — I'm not going to touch it."
-  exit 1
-fi
 ln -sfn "$INBOX" "$ALIAS"
 
 # Self-contained venv so this doesn't depend on the system python having

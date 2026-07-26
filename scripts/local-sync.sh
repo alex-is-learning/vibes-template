@@ -48,11 +48,30 @@ BASE="$(git merge-base "origin/$BRANCH" HEAD)"
 
 git reset --hard "origin/$BRANCH"
 
-find "$CARRY" -type f | while IFS= read -r kept; do
-  f="${kept#$CARRY/}"
+find "$CARRY" -type f -print0 | while IFS= read -r -d '' kept; do
+  f="${kept#"$CARRY"/}"
+  # If it moved on github.com too, yours is the one that survives — but say so,
+  # because otherwise a paragraph written in the browser this morning quietly
+  # disappears tonight. Nothing is destroyed; the other version stays in history.
+  if ! git diff --quiet HEAD -- "$f" 2>/dev/null && ! cmp -s "$kept" "$f"; then
+    echo "NOTE: $f changed here AND on github.com. Keeping your local copy;"
+    echo "      the other version is still in this repo's history."
+  fi
   cp "$kept" "$f"
   echo "kept your changes to $f"
 done
+
+# The inbox IS the page, so an empty one reads as "take everything down" — and it
+# is far likelier that the folder got moved, renamed, or cleared to save space.
+# `mkdir -p` above would have silently recreated it, so this is the only thing
+# standing between a stray drag and the whole page coming down.
+COUNT="$(find "$INBOX" -type f ! -path '*/.*' ! -name "$NOTICE_NAME" | wc -l | tr -d ' ')"
+LIVE="$(find images -maxdepth 1 -type f -name '*.webp' | wc -l | tr -d ' ')"
+if [ "$COUNT" -eq 0 ] && [ "$LIVE" -gt 0 ]; then
+  echo "$INBOX is empty — refusing to take all $LIVE images off your page."
+  echo "Put them back, or delete images/ on github.com if you really mean it."
+  exit 1
+fi
 
 # images/ becomes exactly what's in the inbox right now — additions and
 # removals both fall out of this for free. vibes.py re-encodes everything,
@@ -62,13 +81,29 @@ done
 # Walked recursively, because dragging a whole album out of Photos is the most
 # obvious thing to do with a folder like this, and a non-recursive walk would
 # have ignored every photo in it in silence. The page is flat, so a subfolder's
-# name is folded into the filename rather than lost — that also keeps two files
-# called IMG_0001.jpg in different folders from overwriting each other.
-rm -f images/*.webp
-find "$INBOX" -type f ! -name '.*' ! -name "$NOTICE_NAME" | while IFS= read -r f; do
-  rel="${f#"$INBOX"/}"
-  cp "$f" "images/$(printf '%s' "$rel" | tr '/' '-')"
-done
+# name is folded into the filename rather than lost.
+#
+# `! -path '*/.*'` skips anything under a hidden folder, and it is not tidiness:
+# vibes.py ignores dot-names, so a photo arriving as `.picasaoriginals/x.jpg`
+# would be copied in, never re-encoded, never stripped of its GPS, and committed
+# to a public repo as the untouched original. Deleting the whole of images/ each
+# run rather than just the .webp files is the other half of that — a stray file
+# from an older version would otherwise sit there permanently.
+find images -maxdepth 1 -type f -delete
+find "$INBOX" -type f ! -path '*/.*' ! -name "$NOTICE_NAME" -print0 \
+  | while IFS= read -r -d '' f; do
+      rel="${f#"$INBOX"/}"
+      # Newlines in a filename would break every line-based tool downstream, and
+      # a folder called "a-b" makes "a-b/c.jpg" collide with a top-level
+      # "a-b-c.jpg". Both are rare; neither should cost you a photo.
+      dest="images/$(printf '%s' "$rel" | tr '/\n' '--')"
+      n=1
+      while [ -e "$dest" ]; do
+        dest="images/${n}-$(printf '%s' "$rel" | tr '/\n' '--')"
+        n=$((n + 1))
+      done
+      cp "$f" "$dest"
+    done
 
 ./.venv/bin/python3 scripts/vibes.py
 
