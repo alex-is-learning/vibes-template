@@ -48,18 +48,37 @@ BASE="$(git merge-base "origin/$BRANCH" HEAD)"
 
 git reset --hard "origin/$BRANCH"
 
+# Which files got carried, recorded outside $CARRY so the commit below can include
+# them. Without this they'd be restored and never committed — living on your Mac,
+# dirtying the repo forever, never reaching the page. index.html is the one that
+# matters, but scripts/vibes.py is fair game too: the README invites you to change
+# the compression settings in it.
+CARRIED="$(mktemp)"
+trap 'rm -rf "$CARRY" "$CARRIED"' EXIT
+
 find "$CARRY" -type f -print0 | while IFS= read -r -d '' kept; do
   f="${kept#"$CARRY"/}"
   # If it moved on github.com too, yours is the one that survives — but say so,
   # because otherwise a paragraph written in the browser this morning quietly
   # disappears tonight. Nothing is destroyed; the other version stays in history.
-  if ! git diff --quiet HEAD -- "$f" 2>/dev/null && ! cmp -s "$kept" "$f"; then
+  #
+  # Compared against $BASE, not HEAD: the reset just made the worktree identical
+  # to HEAD by definition, so a HEAD comparison can never be true and this would
+  # be dead code that the README nonetheless promises.
+  if ! git diff --quiet "$BASE" HEAD -- "$f" && ! cmp -s "$kept" "$f"; then
     echo "NOTE: $f changed here AND on github.com. Keeping your local copy;"
     echo "      the other version is still in this repo's history."
   fi
   cp "$kept" "$f"
+  printf '%s\n' "$f" >> "$CARRIED"
   echo "kept your changes to $f"
 done
+
+# Deleting images/ on github.com is the documented way to clear the page — which
+# means the very next run finds no such directory. Without this, `find images`
+# fails, pipefail kills the script, and the sync is dead every night from then on
+# until somebody types mkdir. Recreating it costs nothing and un-bricks that path.
+mkdir -p images
 
 # The inbox IS the page, so an empty one reads as "take everything down" — and it
 # is far likelier that the folder got moved, renamed, or cleared to save space.
@@ -68,8 +87,15 @@ done
 COUNT="$(find "$INBOX" -type f ! -path '*/.*' ! -name "$NOTICE_NAME" | wc -l | tr -d ' ')"
 LIVE="$(find images -maxdepth 1 -type f -name '*.webp' | wc -l | tr -d ' ')"
 if [ "$COUNT" -eq 0 ] && [ "$LIVE" -gt 0 ]; then
-  echo "$INBOX is empty — refusing to take all $LIVE images off your page."
-  echo "Put them back, or delete images/ on github.com if you really mean it."
+  # "It's empty" is a lie if the folder is visibly full — which happens when the
+  # inbox itself sits under a hidden directory, since the walk skips those.
+  if [ "$(find "$INBOX" -type f ! -name '.*' | wc -l | tr -d ' ')" -gt 0 ]; then
+    echo "Everything in $INBOX sits under a hidden folder (a name starting with a"
+    echo "dot), which this skips. Move the inbox somewhere without one in its path."
+  else
+    echo "$INBOX is empty — refusing to take all $LIVE images off your page."
+    echo "Put them back, or delete images/ on github.com if you really mean it."
+  fi
   exit 1
 fi
 
@@ -127,8 +153,12 @@ fi
 # index.html is in here too, not just the images: it's the file you edit to change
 # the words at the top, and carrying an edit across the reset above without ever
 # committing it would leave it living on your Mac and never reaching the page.
-if [[ -n "$(git status --porcelain -- images image_widths_heights.json index.html)" ]]; then
-  git add -A -- images image_widths_heights.json index.html
+PATHS=(images image_widths_heights.json index.html)
+if [ -s "$CARRIED" ]; then
+  while IFS= read -r f; do PATHS+=("$f"); done < "$CARRIED"
+fi
+if [[ -n "$(git status --porcelain -- "${PATHS[@]}")" ]]; then
+  git add -A -- "${PATHS[@]}"
   git commit -m "vibes sync $(date '+%Y-%m-%d %H:%M')" --quiet
   git push origin "$BRANCH"
   echo "pushed"

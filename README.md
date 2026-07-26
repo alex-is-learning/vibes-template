@@ -12,7 +12,7 @@ This is the GitHub Pages version, built so you never have to open a terminal. **
 2. Name it `vibes`. It has to be **public** — GitHub Pages on a private repo is a paid feature, and this page is public regardless.
 3. In your new repo: **Settings → Pages → Source → GitHub Actions**. (Not "Deploy from a branch" — this template deploys from the Action.)
 4. Go to the **Actions** tab and enable workflows if it asks.
-5. Open `images/`, **Add file → Upload files**, drag your own in, **Commit changes**. Then delete the three sample gradients: click one → the bin icon → commit, and repeat. GitHub has no way to delete several files at once, so that's three commits; do them one at a time and let each finish, because starting a new one cancels the run before it.
+5. Open `images/`, **Add file → Upload files**, drag your own in, **Commit changes**. Then delete the three sample gradients: click one → the **···** menu at the top right → **Delete file** → commit, and repeat for the other two. Do them one at a time and let each run finish, because starting a new one cancels the one before it.
 
 Your page is at `https://<your-username>.github.io/vibes/`, live about a minute after each change.
 
@@ -22,7 +22,7 @@ If you named the repo `<your-username>.github.io` instead, it serves at the root
 
 On github.com: open the `images/` folder → **Add file → Upload files** → drag them on → **Commit changes**. That's it. Do one commit at a time and let each run finish — a new one cancels the one before it.
 
-To remove one: click it → the bin icon → commit.
+To remove one: click it → the **···** menu at the top right → **Delete file** → commit.
 
 Everything after that is automatic. The Action converts what you uploaded, rebuilds the list the page reads, and deploys. Watch it in the **Actions** tab if you're curious; ignore it if you're not.
 
@@ -32,9 +32,11 @@ Everything after that is automatic. The Action converts what you uploaded, rebui
 
 If you'd rather never open github.com at all: point Claude Code at this repo (once you've cloned your own copy) and ask it to run `scripts/install-local-sync.sh`. It sets up a `vibes-inbox` alias on your Desktop, wired to a nightly job — drag a photo in and it goes live overnight, drag one out and it comes down, with no commit/upload step in between. `scripts/local-sync.sh` is what runs each night; run it yourself anytime you don't want to wait. `scripts/uninstall-local-sync.sh` turns it back off without touching your photos. If something in the folder can't be published — a video that came off your camera roll with the photos, a damaged file — a plain-text note appears in the folder naming it, and disappears again once you've dealt with it. Nothing to check; it comes to you. Subfolders work, so you can drag a whole album in and keep it filed; the page stays flat and folds the folder name into the filename.
 
+Setting this up needs a terminal and git push access to your repo, so it's the Claude-Code path, not the four-click one above. Either flow works and you can switch between them — the installer moves anything already in `images/` into the inbox first, so nothing drops off the page.
+
 Edits you make to `index.html` on your own machine — your words at the top — are kept and pushed by the nightly run. Edit it on github.com instead and the next run picks that up. Edit it in both places on the same day and your local copy wins; the run says so, and the other version is still in the repo's history.
 
-Emptying the folder does *not* empty the page: a run that would leave nothing published — an inbox that's empty, or holding only files it can't use — refuses and leaves the page as it was, because a folder that suddenly went empty is far more likely to have been moved than to mean "take it all down". To actually clear the page, delete `images/` on github.com. This needs a terminal and git push access to your repo, so it's the Claude-Code path, not the four-click one above — either flow can be used, and you can switch between them (the installer moves anything already in `images/` into the inbox first).
+Emptying the folder does *not* empty the page: a run that would leave nothing published — an inbox that's empty, or holding only files it can't use — refuses and leaves the page as it was, because a folder that suddenly went empty is far more likely to have been moved than to mean "take it all down". To actually clear the page, open `images/` on github.com and use the **···** menu → **Delete directory**.
 
 ## What it does to your images, and why
 
