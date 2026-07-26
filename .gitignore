@@ -4,3 +4,4 @@ _site/
 .vibes-rejected
 .venv/
 .vibes-last-sync
+.vibes-lock/

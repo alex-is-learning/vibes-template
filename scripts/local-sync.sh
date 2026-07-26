@@ -17,6 +17,17 @@ NOTICE="$INBOX/$NOTICE_NAME"
 echo "--- $(date '+%Y-%m-%d %H:%M') ---"
 mkdir -p "$INBOX"
 
+# The README says this is safe to run by hand, and it is — but not at the same
+# moment launchd is running it. Two copies racing over the same images/ end with
+# one dying on a half-deleted directory, and that night's sync just doesn't
+# happen. mkdir is the atomic test-and-set every filesystem gives you for free.
+LOCK=".vibes-lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "another sync is already running — leaving this one to it"
+  exit 0
+fi
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+
 git fetch origin "$BRANCH"
 
 # The Action rewrites history whenever an image is uploaded through github.com,
@@ -37,11 +48,15 @@ git fetch origin "$BRANCH"
 #
 # Two sources of "yours": edits not yet committed, and commits not yet pushed.
 CARRY="$(mktemp -d)"
-trap 'rm -rf "$CARRY"' EXIT
+trap 'rm -rf "$CARRY"; rmdir "$LOCK" 2>/dev/null || true' EXIT
 MARKER=".vibes-last-sync"
 if [ -s "$MARKER" ] && git cat-file -e "$(cat "$MARKER")^{commit}" 2>/dev/null; then
   BASE="$(cat "$MARKER")"
 else
+  # Losing the marker silently re-arms the bug it was added to kill, and it's a
+  # dotfile that a re-clone or a tidy-up removes without ceremony. Say so.
+  echo "no usable $MARKER — falling back to merge-base for this run, which can"
+  echo "mis-read a github.com edit as a local one. It'll be correct again next run."
   BASE="$(git merge-base "origin/$BRANCH" HEAD)"
 fi
 {
@@ -58,16 +73,30 @@ fi
 
 git reset --hard "origin/$BRANCH"
 
+# Record agreement HERE, not only after the push. This line is the moment local
+# and origin are identical, and it must be written even if the run aborts a step
+# later — the empty-inbox guard, a laptop that slept before the push, a crash.
+# Writing it only on the success path left HEAD advanced and the marker stale, so
+# the next run read its own last state as unpushed work and deleted whatever had
+# been typed in the browser since. That is the bug the marker exists to prevent,
+# reintroduced through the back door.
+git rev-parse HEAD > "$MARKER"
+
 # Which files got carried, recorded outside $CARRY so the commit below can include
 # them. Without this they'd be restored and never committed — living on your Mac,
 # dirtying the repo forever, never reaching the page. index.html is the one that
 # matters, but scripts/vibes.py is fair game too: the README invites you to change
 # the compression settings in it.
 CARRIED="$(mktemp)"
-trap 'rm -rf "$CARRY" "$CARRIED"' EXIT
+trap 'rm -rf "$CARRY" "$CARRIED"; rmdir "$LOCK" 2>/dev/null || true' EXIT
 
 find "$CARRY" -type f -print0 | while IFS= read -r -d '' kept; do
   f="${kept#"$CARRY"/}"
+  # Identical to what the reset produced, so there is nothing to carry. Skipping
+  # keeps "kept your changes to index.html" honest — it appeared on runs where
+  # nothing had been touched, which teaches you to ignore the one line that
+  # actually matters when it does appear.
+  if cmp -s "$kept" "$f"; then continue; fi
   # If it moved on github.com too, yours is the one that survives — but say so,
   # because otherwise a paragraph written in the browser this morning quietly
   # disappears tonight. Nothing is destroyed; the other version stays in history.
@@ -99,7 +128,10 @@ LIVE="$(find images -maxdepth 1 -type f -name '*.webp' | wc -l | tr -d ' ')"
 if [ "$COUNT" -eq 0 ] && [ "$LIVE" -gt 0 ]; then
   # "It's empty" is a lie if the folder is visibly full — which happens when the
   # inbox itself sits under a hidden directory, since the walk skips those.
-  if [ "$(find "$INBOX" -type f ! -name '.*' | wc -l | tr -d ' ')" -gt 0 ]; then
+  # Same exclusions as COUNT, minus the hidden-path one — otherwise this script's
+  # own notice file counts as "visible content" and anyone who has ever dropped a
+  # video in the folder gets told their inbox is hidden when it's simply empty.
+  if [ "$(find "$INBOX" -type f ! -name '.*' ! -name "$NOTICE_NAME" | wc -l | tr -d ' ')" -gt 0 ]; then
     echo "Everything in $INBOX sits under a hidden folder (a name starting with a"
     echo "dot), which this skips. Move the inbox somewhere without one in its path."
   else
@@ -131,16 +163,19 @@ find images -maxdepth 1 -type f -delete
 # colliding photos could swap which one is "1-" between runs — a commit and a
 # reshuffled page every night, for no reason anyone could see.
 find "$INBOX" -type f ! -path '*/.*' ! -name "$NOTICE_NAME" -print0 \
-  | sort -z \
+  | LC_ALL=C sort -z \
   | while IFS= read -r -d '' f; do
-      rel="${f#"$INBOX"/}"
-      # Newlines in a filename would break every line-based tool downstream, and
-      # a folder called "a-b" makes "a-b/c.jpg" collide with a top-level
-      # "a-b-c.jpg". Both are rare; neither should cost you a photo.
-      dest="images/$(printf '%s' "$rel" | tr '/\n' '--')"
+      # Basename only. Folding the folder name in reads better in a directory
+      # listing and puts it in a public URL — "ediya-wedding-nov-2025-img_0042"
+      # tells the internet where you were and who with, from a folder you named
+      # for your own eyes. Newlines are flattened because they'd break every
+      # line-based tool downstream, and same-named photos from different folders
+      # get a counter rather than quietly overwriting each other.
+      base="$(printf '%s' "${f##*/}" | tr '\n' '-')"
+      dest="images/$base"
       n=1
       while [ -e "$dest" ]; do
-        dest="images/${n}-$(printf '%s' "$rel" | tr '/\n' '--')"
+        dest="images/${n}-$base"
         n=$((n + 1))
       done
       cp "$f" "$dest"

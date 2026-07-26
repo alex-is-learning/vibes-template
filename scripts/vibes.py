@@ -63,18 +63,29 @@ def slug(name):
 
 
 def is_clean_webp(f):
-    """True if this is already what encode() would produce: WebP, no EXIF, in size.
+    """True if this is already what encode() would produce: WebP, no metadata, in size.
 
     Lets re-runs skip work without re-encoding a re-encode, while still catching
-    a .webp that arrived from a camera or a download with its EXIF intact.
+    a .webp that arrived from a camera or a download with its metadata intact.
+
+    Checking EXIF alone is not enough, and that mistake shipped: a WebP can carry
+    GPS in an XMP packet with an empty EXIF block, and such a file was skipped
+    byte-for-byte and published with its coordinates readable. Anything Pillow
+    surfaces in im.info — xmp, icc_profile, a stray exif key — disqualifies it.
+
+    The suffix test is deliberately case-sensitive. "PHOTO.WEBP" is not a name
+    encode() would ever produce, and the glob that builds the page's list only
+    matches lowercase — so a skipped .WEBP would sit in a public repo un-stripped
+    and invisible. Let it fall through and be re-encoded under a name we chose.
     """
-    if f.suffix.lower() != ".webp":
+    if f.suffix != ".webp":
         return False
     try:
         with Image.open(f) as im:
             exif = im.getexif()
+            metadata = {k for k in im.info if k not in ("background", "loop")}
             return not len(exif) and not exif.get_ifd(0x8825) \
-                and max(im.size) <= MAX_EDGE
+                and not metadata and max(im.size) <= MAX_EDGE
     except Exception:
         return False
 
@@ -107,8 +118,24 @@ def main():
     REJECTED.unlink(missing_ok=True)
 
     rejected, taken = [], set()
-    for src in sorted(IMAGES.iterdir()):
-        if not src.is_file() or src.name.startswith("."):
+    # rglob, not iterdir: github.com's uploader keeps the folder structure when you
+    # drag a folder on, so a whole album lands as images/Cornwall 2026/*.jpg. A
+    # top-level walk never sees those files — they were committed to a public repo
+    # as untouched originals, GPS and all, and no later run ever cleaned them up.
+    #
+    # Only the basename is kept. Folding the folder name in would be tidier to read
+    # and would put "ediya-wedding-nov-2025-" in a public URL; free_name already
+    # handles two photos arriving with the same name.
+    for src in sorted(IMAGES.rglob("*"), key=lambda p: str(p)):
+        if not src.is_file():
+            continue
+
+        # A dot-name can't be published (the page's list skips it) and can't be
+        # checked, so leaving it means an unexamined file in a public folder.
+        if any(part.startswith(".") for part in src.relative_to(IMAGES).parts):
+            print(f"REJECTED {src.name}: hidden files aren't published")
+            src.unlink()
+            rejected.append(src.name)
             continue
 
         # Not an image at all — a .mov dragged off a camera roll, a stray .txt.
@@ -139,6 +166,13 @@ def main():
         dest.write_bytes(body)
         print(f"{src.name} -> {dest.name} "
               f"({was / 1e6:.1f}MB -> {len(body) / 1e6:.1f}MB)")
+
+    # The uploaded folders are empty now that their contents have been re-encoded
+    # into the top level. Git doesn't track directories, but the runner's checkout
+    # and anyone's working copy would keep them around looking meaningful.
+    for d in sorted(IMAGES.rglob("*"), key=lambda p: -len(p.parts)):
+        if d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
 
     files = []
     for f in sorted(IMAGES.glob("*.webp")):

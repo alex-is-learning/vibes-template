@@ -8,6 +8,25 @@ on:
       - 'index.html'
       - 'scripts/vibes.py'
       - '.github/workflows/vibes.yml'
+      # Uploading from the repo's front page instead of from inside images/ puts
+      # your photos at the top level. Without these, no run starts at all: the
+      # commit succeeds, the page doesn't change, and an untouched original with
+      # its GPS in it sits in a public repo with nothing anywhere saying so.
+      - '*.jpg'
+      - '*.jpeg'
+      - '*.png'
+      - '*.webp'
+      - '*.heic'
+      - '*.heif'
+      - '*.gif'
+      - '*.bmp'
+      - '*.tif'
+      - '*.tiff'
+      - '*.avif'
+      - '*.JPG'
+      - '*.JPEG'
+      - '*.PNG'
+      - '*.HEIC'
   workflow_dispatch:
 
 # contents: write so it can commit the compressed images back over your originals.
@@ -18,9 +37,14 @@ permissions:
   pages: write
   id-token: write
 
+# Queue, never cancel. A cancelled run dies somewhere in the middle, and if that
+# is before the rewrite step below, the commit carrying your untouched original
+# stays on main permanently — the next run rewinds only as far as *its* own push,
+# so nothing ever cleans it up. Two uploads in quick succession is ordinary
+# behaviour, and it silently defeated the entire point of this workflow.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -40,6 +64,21 @@ jobs:
           python-version: '3.12'
 
       - run: pip install pillow pillow-heif
+
+      # Photos uploaded from the repo's front page land here rather than in
+      # images/. Rejecting them would be correct and useless — you meant to add
+      # them, and an original left at the top level is exactly the un-stripped
+      # public file this repo exists to prevent. So move them in and carry on;
+      # vibes.py strips them like anything else.
+      - name: Rescue images uploaded to the wrong place
+        run: |
+          mkdir -p images
+          find . -maxdepth 1 -type f \
+            \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \
+            -o -iname '*.webp' -o -iname '*.heic' -o -iname '*.heif' \
+            -o -iname '*.gif' -o -iname '*.bmp' -o -iname '*.tif' \
+            -o -iname '*.tiff' -o -iname '*.avif' \) \
+            -exec git mv -f {} images/ \; -exec echo "moved {} into images/" \;
 
       - run: python3 scripts/vibes.py
 
