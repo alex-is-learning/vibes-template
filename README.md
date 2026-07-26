@@ -2,7 +2,7 @@
 
 A page that scatters your images at random across the screen. No grid, no captions, no dates — just a wall of things you liked.
 
-Live examples: [Sophia](https://girl.surgery/website_vibes/), who wrote the original, plus [Xavi](https://www.xavicf.com/vibes), [Guzey](https://guzey.com/vibes/), [Catherine](https://catherinebrewer.github.io/vibes/), and [mine](https://alexanderlarge.com/vibes).
+Live examples: [Sophia](https://girl.surgery/website_vibes/), who wrote the original, plus [Xavi](https://xavicf.com/vibes), [Guzey](https://guzey.com/vibes/), [Catherine](https://catherinebrewer.github.io/vibes/), and [mine](https://alexanderlarge.com/vibes).
 
 This is the GitHub Pages version, built so you never have to open a terminal. **The `images/` folder is the page.** Drag a file in and it appears. Delete one and it comes down. There's no draft state and no publish button.
 
