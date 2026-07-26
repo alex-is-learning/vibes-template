@@ -34,7 +34,7 @@ If you'd rather never open github.com at all: point Claude Code at this repo (on
 
 Edits you make to `index.html` on your own machine — your words at the top — are kept and pushed by the nightly run. Edit it on github.com instead and the next run picks that up. Edit it in both places on the same day and your local copy wins; the run says so, and the other version is still in the repo's history.
 
-Emptying the folder does *not* empty the page: a run that finds nothing in the inbox while images are live refuses and stops, because a folder that suddenly went empty is far more likely to have been moved than to mean "take it all down". To actually clear the page, delete `images/` on github.com. This needs a terminal and git push access to your repo, so it's the Claude-Code path, not the four-click one above — either flow can be used, and you can switch between them (the installer moves anything already in `images/` into the inbox first).
+Emptying the folder does *not* empty the page: a run that would leave nothing published — an inbox that's empty, or holding only files it can't use — refuses and leaves the page as it was, because a folder that suddenly went empty is far more likely to have been moved than to mean "take it all down". To actually clear the page, delete `images/` on github.com. This needs a terminal and git push access to your repo, so it's the Claude-Code path, not the four-click one above — either flow can be used, and you can switch between them (the installer moves anything already in `images/` into the inbox first).
 
 ## What it does to your images, and why
 
