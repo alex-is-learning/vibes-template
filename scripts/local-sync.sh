@@ -48,6 +48,7 @@ if [[ -s .vibes-rejected ]]; then
     echo "These files are in this folder but are not on your page:"
     echo
     sed 's/^/  · /' .vibes-rejected
+    echo   # .vibes-rejected has no trailing newline, so this closes the last line
     echo
     echo "Either they aren't images (a video off a camera roll, a PDF), or the file"
     echo "is damaged and can't be opened. Re-save them as JPEGs and drop them back in,"
