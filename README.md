@@ -36,7 +36,7 @@ Setting this up needs a terminal and git push access to your repo, so it's the C
 
 Edits you make to `index.html` on your own machine — your words at the top — are kept and pushed by the nightly run. Edit it on github.com instead and the next run picks that up. Edit it in both places on the same day and your local copy wins; the run says so, and the other version is still in the repo's history.
 
-Emptying the folder does *not* empty the page: a run that would leave nothing published — an inbox that's empty, or holding only files it can't use — refuses and leaves the page as it was, because a folder that suddenly went empty is far more likely to have been moved than to mean "take it all down". To actually clear the page, open `images/` on github.com and use the **···** menu → **Delete directory**.
+Emptying the folder does *not* empty the page: a run that would leave nothing published — an inbox that's empty, or holding only files it can't use — refuses and leaves the page as it was, because a folder that suddenly went empty is far more likely to have been moved than to mean "take it all down". To actually clear the page: empty the inbox folder first, then open `images/` on github.com and use the **···** menu → **Delete directory**. Deleting it while the inbox still has photos in it just means the next run puts them all back.
 
 ## What it does to your images, and why
 

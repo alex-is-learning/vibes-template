@@ -26,14 +26,24 @@ git fetch origin "$BRANCH"
 # it gone in the morning with nothing to say why. So anything changed outside the
 # two paths this script owns is carried across the reset and put back after it.
 #
-# What counts as "yours" is measured against your own last commit, never against
-# the remote — otherwise editing the text on github.com would look like a local
-# change here, and this would faithfully carry the stale copy across and push it
-# back over what you just wrote. Two sources: edits you haven't committed, and
-# edits you committed but haven't pushed.
+# What counts as "yours" is measured against the last state this machine and the
+# remote agreed on — recorded at the end of each successful run, because it cannot
+# be inferred. `git merge-base` is the obvious way to find it and it does not work
+# here: the Action force-pushes a rewritten commit, so the local machine's last
+# commit is never an ancestor of origin and the merge base lands one commit too
+# early. That makes the run's own previous edit look like unpushed local work, and
+# it gets carried across the reset and written over whatever you typed in the
+# browser since — the exact thing this carry exists to prevent, silently.
+#
+# Two sources of "yours": edits not yet committed, and commits not yet pushed.
 CARRY="$(mktemp -d)"
 trap 'rm -rf "$CARRY"' EXIT
-BASE="$(git merge-base "origin/$BRANCH" HEAD)"
+MARKER=".vibes-last-sync"
+if [ -s "$MARKER" ] && git cat-file -e "$(cat "$MARKER")^{commit}" 2>/dev/null; then
+  BASE="$(cat "$MARKER")"
+else
+  BASE="$(git merge-base "origin/$BRANCH" HEAD)"
+fi
 {
   git diff --name-only HEAD -- . \
     ':(exclude)images' ':(exclude)image_widths_heights.json'
@@ -165,6 +175,11 @@ if [[ -n "$(git status --porcelain -- "${PATHS[@]}")" ]]; then
 else
   echo "no changes"
 fi
+
+# Local and the remote now agree, so record where. Only reached if the push above
+# succeeded — `set -e` aborts before this otherwise, leaving the previous marker
+# in place, which is the correct answer for a run that didn't land.
+git rev-parse HEAD > "$MARKER"
 
 # A rejected file is silent otherwise: it just never shows up on the page, night
 # after night, and the log that says why is a file nobody opens. So the notice
