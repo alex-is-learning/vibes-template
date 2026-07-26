@@ -90,7 +90,12 @@ fi
 # run rather than just the .webp files is the other half of that — a stray file
 # from an older version would otherwise sit there permanently.
 find images -maxdepth 1 -type f -delete
+# Sorted, so the collision counter below hands out the same prefix every night.
+# Unsorted, `find` returns whatever order the filesystem feels like, and the two
+# colliding photos could swap which one is "1-" between runs — a commit and a
+# reshuffled page every night, for no reason anyone could see.
 find "$INBOX" -type f ! -path '*/.*' ! -name "$NOTICE_NAME" -print0 \
+  | sort -z \
   | while IFS= read -r -d '' f; do
       rel="${f#"$INBOX"/}"
       # Newlines in a filename would break every line-based tool downstream, and
@@ -106,6 +111,18 @@ find "$INBOX" -type f ! -path '*/.*' ! -name "$NOTICE_NAME" -print0 \
     done
 
 ./.venv/bin/python3 scripts/vibes.py
+
+# The count check above is the cheap one and catches the common case — the folder
+# got moved or renamed. This is the one that can't be fooled: an inbox holding
+# nothing but files that turn out to be unpublishable (one stray video) passes
+# the count and would still strip the page bare. Judge on what actually survived
+# encoding, and put everything back if the answer is nothing.
+if [ "$(find images -maxdepth 1 -name '*.webp' | wc -l | tr -d ' ')" -eq 0 ] \
+   && [ "$LIVE" -gt 0 ]; then
+  git checkout -- images image_widths_heights.json
+  echo "nothing in $INBOX could be published, so all $LIVE images would have come"
+  echo "down. Left the page as it was. See the note in the folder for which files."
+fi
 
 # index.html is in here too, not just the images: it's the file you edit to change
 # the words at the top, and carrying an edit across the reset above without ever
